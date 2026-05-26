@@ -16,28 +16,22 @@ def traditional_convolution_cpu(image, kernel): # define a funcao que recebe a i
         
     return output # Retorna a imagem RGB completamente filtrada.
 
-def depthwise_separable_convolution_cpu(image, spatial_kernel): # Define a função que recebe a imagem e o kernel espacial (ex: o kernel do Desfoque Gaussiano ). Extrai as dimensões da imagem idêntico ao método anterior.
-    """
-    Implementação da convolução separável para o projeto.
-    """
+def depthwise_separable_convolution_cpu_otimizada(image, spatial_kernel):
     h, w, channels = image.shape
     
-    # 1. DEPTHWISE STEP (Filtragem Espacial)
-    # Aplica o kernel (ex: Gaussiano ou Sobel) separadamente em cada canal RGB
+    # 1. DEPTHWISE STEP (Continua rápido via SciPy)
     depthwise_out = np.zeros_like(image)
     for c in range(channels):
         depthwise_out[:, :, c] = convolve2d(image[:, :, c], spatial_kernel, mode='same', boundary='symm')
         
-    # 2. POINTWISE STEP (Fusão de Canais - kernel 1x1)
-    # Exemplo: um filtro 1x1 que faz a média dos 3 canais (R, G, B)
-    # Na prática de Deep Learning, essa matriz seria aprendida. Aqui usamos pesos fixos.
-    pointwise_kernel = np.array([0.33, 0.33, 0.33]) 
+    # 2. POINTWISE STEP OTIMIZADO (Sem loops!)
+    # Multiplica a matriz inteira pelos pesos usando transmissão (broadcasting) do NumPy
+    pointwise_kernel = np.array([0.33, 0.33, 0.33], dtype=np.float32)
     
-    output = np.zeros_like(image)
-    for i in range(h):
-        for j in range(w):
-            # O pixel recebe a combinação dos 3 canais baseada no kernel 1x1
-            pixel_val = np.dot(depthwise_out[i, j, :], pointwise_kernel)
-            output[i, j, :] = pixel_val
+    # O np.dot ao longo do último eixo (axis=-1) substitui perfeitamente o loop duplo
+    output_grayscale = np.dot(depthwise_out, pointwise_kernel)
+    
+    # Reconverte para 3 canais idênticos (RGB) para manter a compatibilidade do seu projeto
+    output = np.stack([output_grayscale] * channels, axis=-1)
             
     return output
